@@ -43,4 +43,4 @@ This will:
 
 ## Required packages
 
-dplyr, tidyr, readxl, readr
+dplyr, tidyr, readxl, readr, stringr
