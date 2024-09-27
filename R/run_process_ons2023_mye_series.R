@@ -22,6 +22,7 @@ fetch_and_clean_mye_data(url_raw = "https://www.ons.gov.uk/file?uri=/peoplepopul
 mye_2011_on <- readRDS("data/intermediate/mye_2011_on(2023_geog).rds")
 
 mye_international_total_net <- mye_2011_on %>%
+  filter(year >= 2012) %>%
   group_by(gss_code, gss_name, sex, age, year) %>%
   summarise(base_in = sum(value[component == "international_in"]),
             base_out = sum(value[component == "international_out"]),
