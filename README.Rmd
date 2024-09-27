@@ -13,6 +13,46 @@ knitr::opts_chunk$set(
 )
 ```
 
+```{r,  include = FALSE}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+```
+
+
+```{r, include = FALSE}
+source("R/functions/optimise_gross_flows.R")
+```
+
+```{r, include = FALSE}
+sel_code <- "E09000007"
+sel_sex <- "female"
+sel_components <- c("international_in", "international_out", "international_net", "unattrib")
+
+mye_comp <- bind_rows(
+  readRDS("data/intermediate/mye_2011_on(2023_geog).rds") %>%
+    mutate(source = "original"),
+  readRDS("data/processed/new_mye_series_2011_on.rds") %>%
+    mutate(source = "adjusted")) %>%
+  filter(gss_code == sel_code,
+         sex == sel_sex,
+         component %in% sel_components) %>%
+  mutate(value = case_when(
+    component == "international_out" ~ -value,
+    TRUE ~ value
+  ))
+
+mye_comp_totals <- mye_comp %>%
+  group_by(across(-any_of(c("value", "age")))) %>%
+  summarise(value = sum(value), .groups = "drop") %>%
+  arrange(year) %>%
+  group_by(across(-any_of(c("value", "year")))) %>%
+  mutate(cumulative_value = cumsum(value)) %>%
+  ungroup()
+
+```
+
+
 # convert_upc
 
 This is an example of how the Unattributable Population Change (UPC) component included in the rebased ONS population back series could be replaced with adjustments to the existing annual international migration estimates.
@@ -35,7 +75,164 @@ This will:
 * Create modelled alternative annual international gross flows that are consistent with the sum of the international_net and UPC components
 * Write out the new series to *data/processed/* as both an RDS file in tidy format and as a csv in a similar format to that originally published by ONS
 
-## Required packages
+### Required packages
 
 dplyr, tidyr, readxl, readr, stringr
+
+
+# Methodology
+
+In population modelling, it is often the case that we wish to make an adjustment to the size of a population stock or net migration flow and must make corresponding adjustment to the size of the underlying gross flows, such that they remain consistent. When the adjustment to the net flow is positive, consistent gross flows can be created by some combination of higher inflows and/or lower outflows (and vice versa). As a given net flow can be described by any number of different pairs of in- and out-flows, the problem is to choose the most appropriate values for the in- and outflows.
+
+The approach taken by the GLA to this problem is to try and identify adjustments that minimise (from a statistical perspective) changes from the original gross flow estimates.  
+
+* Gross flows are treated as having an underlying probability density described by a Poission distribution with means equal to the original estimates. 
+
+* Starting from the initial values of the gross flows, an incremental adjustment is made to either the inflow or outflow according to which would see the smaller decrease in the probability density after the adjustment is made.  
+
+* Successive incremental adjustments are made until the gross flows are consistent with desired net flow.
+
+The relative size of the adjustments to the in- and out-flows is determined by the sizes of the initial flows and the size and direction of the adjustment required.  In cases where the initial gross flows are already consistent with the target net, the function will return these values unchanged. 
+
+The example below illustrates how the modelled gross flows for a given pair of base flows vary with the target net figure.
+
+```{r, echo = FALSE}
+
+example_df <- data.frame(target_net = c(-100:100), base_in = 40, base_out = 15) %>%
+  mutate(model_flows = optimise_gross_flows(base_in, base_out, target_net)) %>%
+  unnest_wider(col = model_flows) %>%
+  mutate(outflow = -outflow) %>%
+  pivot_longer(cols = c("inflow", "outflow"), names_to = "direction", values_to = "gross_flows")
+
+example_df %>%
+  ggplot(aes(x = target_net, y = gross_flows, colour = direction)) +
+  theme_minimal() +
+  geom_hline(yintercept = 0, colour = "grey") +
+  geom_hline(yintercept = c(40, -15), linetype = "dotted") +
+  geom_vline(xintercept = 25, linetype = "dotted") +
+  geom_line(linewidth = 1, alpha = 0.7) +
+  labs(title = "Returned gross flow values by net flow target",
+       subtitle = "base inflow = 40, base outflow = 15, original net = +25")
+
+
+```
+
+In this application the target international net flow is taken to be the sum of the values of the original international net flow and the UPC component.
+
+The following charts illustrate the original and adjusted data for females in Camden - a group with a very high UPC component in the rebased estimates which removes almost 18 thousand persons from the population over the course of the decade.   
+
+
+```{r, echo = FALSE}
+
+mye_comp_totals %>%
+  filter(component %in% c("international_net", "unattrib")) %>%
+  filter(between(year, 2011, 2021)) %>%
+  ggplot(aes(x = year, y = value, colour = component, linetype = source)) +
+  theme_minimal() +
+  geom_hline(yintercept = 0, colour = "grey") +
+  geom_line(linewidth = 1, alpha = 0.4) +
+  labs(title = "Original and adjusted annual international net and UPC",
+       subtitle = "Camden, female") +
+    scale_x_continuous(n.breaks = 9)
+
+```
+
+```{r, echo = FALSE}
+
+mye_comp_totals %>%
+  filter(component %in% c("international_net", "unattrib")) %>%
+  filter(between(year, 2011, 2021)) %>%
+  ggplot(aes(x = year, y = cumulative_value, colour = source, linetype = component)) +
+  theme_minimal() +
+  geom_hline(yintercept = 0, colour = "grey") +
+  geom_line(linewidth = 1, alpha = 0.4) +
+  labs(title = "Cummulative contribution of international net and UPC",
+       subtitle = "Camden, female") +
+    scale_x_continuous(n.breaks = 9)
+
+```
+
+```{r, echo = FALSE}
+
+mye_comp %>%
+  filter(year == 2019) %>%
+  filter(component %in% c("international_net", "unattrib")) %>%
+  ggplot(aes(x = age, y = value, colour = source, linetype = component)) +
+  theme_minimal() +
+  geom_hline(yintercept = 0, colour = "grey") +
+  geom_line(alpha = 0.7) +
+  labs(title = "Original and adjusted international net and UPC",
+       subtitle = "Camden, female, 2019") + 
+  scale_x_continuous(n.breaks = 9) +
+  facet_wrap("source")
+
+```
+
+```{r, echo = FALSE}
+
+mye_comp %>%
+  filter(year == 2019) %>%
+  filter(between(age, 19, 29)) %>%
+  filter(component %in% c("international_net", "unattrib")) %>%
+  ggplot(aes(x = age, y = value, colour = source, linetype = component)) +
+  theme_minimal() +
+  geom_hline(yintercept = 0, colour = "grey") +
+  geom_point(size = 3, alpha = 0.7) +
+  geom_line(linewidth = 1, alpha = 0.4) + 
+  labs(title = "Original and adjusted international net and UPC",
+       subtitle = "Camden, female, 2019; selected ages") + 
+  scale_x_continuous(n.breaks = 9)
+
+```
+As intended, the adjusted gross flows closely track the distributions of the original estimates by year and by age.
+
+```{r, echo = FALSE}
+
+mye_comp_totals %>%
+  filter(component %in% c("international_in", "international_out")) %>%
+  filter(between(year, 2011, 2021)) %>%
+  ggplot(aes(x = year, y = value, colour = component, linetype = source)) +
+  theme_minimal() +
+  geom_hline(yintercept = 0, colour = "grey") +
+  geom_line(linewidth = 1, alpha = 0.4) +
+  labs(title = "Original and adjusted annual international gross flows",
+       subtitle = "Camden, female",
+       caption = "Outflows shown as negative values") +
+    scale_x_continuous(n.breaks = 9)
+
+```
+
+```{r, echo = FALSE}
+
+mye_comp %>%
+  filter(year == 2019) %>%
+  filter(component %in% c("international_in", "international_out")) %>%
+  ggplot(aes(x = age, y = value, colour = component, linetype = source)) +
+  theme_minimal() +
+  geom_hline(yintercept = 0, colour = "grey") +
+  geom_line(alpha = 0.7) +
+  labs(title = "Original and adjusted international gross flows by age",
+       subtitle = "Camden, female, 2019",
+       caption = "Outflows shown as negative values") +
+    scale_x_continuous(n.breaks = 9)
+
+```
+
+```{r, echo = FALSE}
+
+mye_comp %>%
+  filter(year == 2019) %>%
+  filter(between(age, 19, 29)) %>%
+  filter(component %in% c("international_in", "international_out")) %>%
+  ggplot(aes(x = age, y = value, colour = component, linetype = source)) +
+  theme_minimal() +
+  geom_hline(yintercept = 0, colour = "grey") +
+  geom_point(size = 3, alpha = 0.7) +
+  geom_line(linewidth = 1, alpha = 0.4) + 
+  scale_x_continuous(n.breaks = 9) +  
+  labs(title = "Original and adjusted international gross flows by age",
+       subtitle = "Camden, female, 2019; selected ages",
+       caption = "Outflows shown as negative values") 
+
+```
 
