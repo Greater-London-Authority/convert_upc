@@ -6,7 +6,9 @@
 # on an optimum solution. lower values of jump_scale may be faster, but potentially less reliable.
 # Always use a value greater than 1
 
-split_gross_flows <- function(base_international, base_domestic, target_total, jump_scale = 10) {
+split_gross_flows <- function(base_international, base_domestic, target_total,
+                              relative_international_confidence = 1,
+                              jump_scale = 10) {
 
   # as flows are modelled as Poisson distributions, values must be integers for the main part of the modelling process
   base_international <- abs(base_international)
@@ -32,7 +34,7 @@ split_gross_flows <- function(base_international, base_domestic, target_total, j
 
     #test whether making adjustment to inflow or outflow has bigger impact on combined likelihood
     #make adjustment to flow that gives smallest decrease
-    p_international_adjust <- dpois(new_international + int_adjust, base_international, log = TRUE) + dpois(new_domestic, base_domestic, log = TRUE)
+    p_international_adjust <- relative_international_confidence * dpois(new_international + int_adjust, base_international, log = TRUE) + dpois(new_domestic, base_domestic, log = TRUE)
     p_domestic_adjust <- dpois(new_international, base_international, log = TRUE) + dpois(new_domestic + int_adjust, base_domestic, log = TRUE)
 
     if(p_international_adjust > p_domestic_adjust) {

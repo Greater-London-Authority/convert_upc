@@ -62,7 +62,8 @@ modelled_dpm_inflows <- dpm_2011_on %>%
   left_join(mye_inflows, by = NULL) %>%
   mutate(model_flows = split_gross_flows(base_international = international_in,
                                          base_domestic = internal_in,
-                                         target_total = total_in)) %>%
+                                         target_total = total_in,
+                                         relative_international_confidence = 0.98)) %>%
   unnest_wider(col = model_flows) %>%
   select(-c(international_in, internal_in, total_in)) %>%
   rename(international_in = new_international,
@@ -78,7 +79,8 @@ modelled_dpm_outflows <- dpm_2011_on %>%
   left_join(mye_outflows, by = NULL) %>%
   mutate(model_flows = split_gross_flows(base_international = international_out,
                                          base_domestic = internal_out,
-                                         target_total = total_out)) %>%
+                                         target_total = total_out,
+                                         relative_international_confidence = 0.98)) %>%
   unnest_wider(col = model_flows) %>%
   select(-c(international_out, internal_out, total_out)) %>%
   rename(international_out = new_international,

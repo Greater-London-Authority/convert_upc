@@ -22,6 +22,7 @@ library(ggplot2)
 
 ```{r, include = FALSE}
 source("R/functions/optimise_gross_flows.R")
+source("R/functions/split_gross_flows.R")
 ```
 
 ```{r, include = FALSE}
@@ -52,10 +53,48 @@ mye_comp_totals <- mye_comp %>%
 
 ```
 
+```{r, include = FALSE}
+sel_code <- "E08000035"
+sel_sex <- "female"
+sel_components <- c("international_in", "international_out", "international_net",
+                    "unattrib", "total_net", 
+                    "internal_in", "internal_out", "internal_net")
+
+dpm_comp <- bind_rows(
+  readRDS("data/intermediate/mye_2011_on(2023_geog).rds") %>%
+    mutate(source = "MYE original"),
+  readRDS("data/processed/new_mye_series_2011_on.rds") %>%
+    mutate(source = "MYE adjusted"),
+  readRDS("data/processed/new_dpm_series_2011_on.rds") %>%
+    mutate(source = "DPM")) %>%
+  filter(gss_code == sel_code,
+         sex == sel_sex,
+         component %in% sel_components) %>%
+  mutate(value = case_when(
+    component == "international_out" ~ -value,
+    component == "internal_out" ~ -value,
+    component == "total_out" ~ -value,
+    TRUE ~ value
+  ))
+
+dpm_comp_totals <- dpm_comp %>%
+  group_by(across(-any_of(c("value", "age")))) %>%
+  summarise(value = sum(value), .groups = "drop") %>%
+  arrange(year) %>%
+  group_by(across(-any_of(c("value", "year")))) %>%
+  mutate(cumulative_value = cumsum(value)) %>%
+  ungroup()
+
+```
+
 
 # convert_upc
 
-This is an example of how the Unattributable Population Change (UPC) component included in the rebased ONS population back series could be replaced with adjustments to the existing annual international migration estimates.
+This repository contains two related examples of:
+* how the Unattributable Population Change (UPC) component included in the rebased ONS mid-year estimate (MYE) population back series could be replaced with adjustments to the existing annual international migration estimates.
+* how total in- and out-flows in ONS's current Admin-Based Population Estimates (ABPE)/Dynamic Population Model (DPM) estimates could be split into separate international and domestic flows.
+
+## Converting UPC in the rebased MYE series
 
 The method shown here uses a single function that takes an initial pair gross flows, together with a target net value, and returns new gross flows that are consistent with this net figure and represent the minimum 'cost' change to the original flows. 
 
@@ -65,14 +104,27 @@ The full GLA rebasing process is complex and involves fitting new annual net flo
 
 However, if the goal is just to reassign already calculated UPC to international flows, without modifying the estimated population, then the process is greatly simplified.
 
+## Splitting ABPE total flows
+
+This method repurposes the function used for modifying a pair of base in- and out-flows to fit a target net flow such that it instead modifies a pair of flows with the same direction to fit a total figure, while accounting for the user's relative confidence in the accuracy of the base international and domestic flow estimates.
+
+Here the base domestic and international flows are taken from the ONS rebased MYE series and used to split the total flow components in the published ABPE/DPM series.
+
+Confidence in the accuracy of flow estimates will vary by area, age, sex, direction, and year.  In this example, an arbitrary value of 0.98 has been used for the confidence parameter in all cases - with values below 1 implying lower confidence in the accuracy of the original estimates of international migration than of domestic. 
+
 ## Instructions
 
-The entire process is run from the script *R/run_process_ons2023_mye_series.R*
+The two processes are run from the scripts *R/run_process_ons2023_mye_series.R* and *R/run_process_ons_dpm_series.R*, respectively.
 
-This will:
+*R/run_process_ons2023_mye_series.R* will:
 
 * Fetch and clean the detailed mid-year estimates series published by ONS that covers the period 2011 to 2023 
 * Create modelled alternative annual international gross flows that are consistent with the sum of the international_net and UPC components
+* Write out the new series to *data/processed/* as both an RDS file in tidy format and as a csv in a similar format to that originally published by ONS
+
+*R/run_process_ons_dpm_series.R* will:
+* Fetch and clean the detailed mid-year estimates series published by ONS that covers the period 2011 to 2023 
+* Fetch and clean the current admin-based estimates series published July 2024, which also covers the period 2011 to 2023 * Create modelled annual international and internal flow components that are consistent with the original total immigration and emigration components
 * Write out the new series to *data/processed/* as both an RDS file in tidy format and as a csv in a similar format to that originally published by ONS
 
 ### Required packages
@@ -80,7 +132,9 @@ This will:
 dplyr, tidyr, readxl, readr, stringr
 
 
-# Methodology
+# Overview of methodologies
+
+## Converting UPC in the rebased MYE series
 
 In population modelling, it is often the case that we wish to make an adjustment to the size of a population stock or net migration flow and must make corresponding adjustment to the size of the underlying gross flows, such that they remain consistent. When the adjustment to the net flow is positive, consistent gross flows can be created by some combination of higher inflows and/or lower outflows (and vice versa). As a given net flow can be described by any number of different pairs of in- and out-flows, the problem is to choose the most appropriate values for the in- and outflows.
 
@@ -236,3 +290,28 @@ mye_comp %>%
 
 ```
 
+## Splitting total gross flows from DPM
+
+```{r, echo = FALSE}
+
+example_df <- expand.grid(target_total = c(0:400), relative_international_confidence = c(0.97, 0.98, 0.99, 1), 
+                         base_international = 50, base_domestic = 100) %>%
+  mutate(model_flows = split_gross_flows(base_international, base_domestic, target_total,
+                                         relative_international_confidence,
+                                         jump_scale = 30)) %>%
+  unnest_wider(col = model_flows) %>%
+  select(-c(base_international, base_domestic)) %>%
+  pivot_longer(cols = c("new_international", "new_domestic"), names_to = "flow", values_to = "value")
+
+example_df %>%
+  ggplot(aes(x = target_total, y = value, colour = flow)) +
+  theme_minimal() +
+  geom_hline(yintercept = c(50, 100), linetype = "dotted") +
+  geom_vline(xintercept = 150, linetype = "dotted") +
+  geom_line(linewidth = 1, alpha = 0.7) +
+  labs(title = "Returned flows by total target and relative confidence",
+       subtitle = "base international = 50, base domestic = 100, original total flow = 150") +
+  facet_wrap("relative_international_confidence", ncol = 2)
+
+
+```
