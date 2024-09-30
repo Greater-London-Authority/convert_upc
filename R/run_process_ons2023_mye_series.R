@@ -12,12 +12,15 @@ if(!dir.exists("data/processed/")) dir.create("data/processed/", recursive = TRU
 
 #2011-onward MYE
 
-# fetch and clean mid-year estimate data
+# fetch and clean mid-year estimate data if it hasn't already been done
 
-fetch_and_clean_mye_data(url_raw = "https://www.ons.gov.uk/file?uri=/peoplepopulationandcommunity/populationandmigration/populationestimates/datasets/estimatesofthepopulationforenglandandwales/mid2011tomid2023detailedtimeserieseditionofthisdataset/myebtablesenglandwales20112023.xlsx",
-                         fpath_raw = "data/raw/mye_2011_on(2023_geog).xlsx",
-                         fpath_clean = "data/intermediate/mye_2011_on(2023_geog).rds",
-                         sheet_name = "MYEB2")
+if(!file.exists("data/intermediate/mye_2011_on(2023_geog).rds")) {
+
+  fetch_and_clean_mye_data(url_raw = "https://www.ons.gov.uk/file?uri=/peoplepopulationandcommunity/populationandmigration/populationestimates/datasets/estimatesofthepopulationforenglandandwales/mid2011tomid2023detailedtimeserieseditionofthisdataset/myebtablesenglandwales20112023.xlsx",
+                           fpath_raw = "data/raw/mye_2011_on(2023_geog).xlsx",
+                           fpath_clean = "data/intermediate/mye_2011_on(2023_geog).rds",
+                           sheet_name = "MYEB2")
+}
 
 mye_2011_on <- readRDS("data/intermediate/mye_2011_on(2023_geog).rds")
 
@@ -27,7 +30,9 @@ mye_international_total_net <- mye_2011_on %>%
   summarise(base_in = sum(value[component == "international_in"]),
             base_out = sum(value[component == "international_out"]),
             total_net = sum(value[component %in% c("international_net", "unattrib")]),
-            .groups = "drop")
+            .groups = "drop") %>%
+  mutate(base_in  = pmax(base_in, 0.5)) %>%
+  mutate(base_out  = pmax(base_out, 0.5))
 
 
 # take new international net to be original international net estimate + unattrib
@@ -52,7 +57,8 @@ new_mye_series <- mye_2011_on %>%
                            "international_out",
                            "international_net",
                            "unattrib")) %>%
-  bind_rows(modelled_international_flows)
+  bind_rows(modelled_international_flows) %>%
+  arrange(gss_code, component, year, sex, age)
 
 #save RDS file in tidy format
 
@@ -61,10 +67,13 @@ saveRDS(new_mye_series, "data/processed/new_mye_series_2011_on.rds")
 # create csv output in same general format as ONS published table
 
 new_mye_series_wide <- new_mye_series %>%
+  mutate(value = round(value, 4)) %>%
   mutate(component_year = paste0(component, "_", year)) %>%
   select(-c(component, year)) %>%
-  pivot_wider(names_from = "component_year", values_from = "value")
+  pivot_wider(names_from = "component_year", values_from = "value") %>%
+  arrange(gss_code, sex, age)
 
 
 write_csv(new_mye_series_wide,
-        "data/processed/new_mye_series_2011_on_wide.csv")
+        file = "data/processed/new_mye_series_2011_on_wide.csv",
+        na = "0")
