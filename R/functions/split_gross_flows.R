@@ -1,12 +1,21 @@
-# given a set of prior values for gross flows (base_in and base_out) and a target net flow, return
-# the maximum likelihood combination of gross flows that satisfy the target
+# given a set of prior values for gross flows of the same direction by type (base_international and base_domestic),
+# and a target total gross flow, return the maximum likelihood combination of gross flows that satisfy the target
 # flow probabilities are modelled as Poisson distributions, with lambda values set as the base flows
 
 # the jump_scale parameter affects the maximum size of the adjustment steps as the algorithm tries to converge
 # on an optimum solution. lower values of jump_scale may be faster, but potentially less reliable.
 # Always use a value greater than 1
 
-split_gross_flows <- function(base_international, base_domestic, target_total, jump_scale = 10) {
+# the relative_international_confidence parameter determines how adjustments are prioritised between international and domestic
+# a value of 1 represents equal confidence in the base values for each and the output flows will have the same proportional
+# distribution as the inputs.
+# For values < 1, adjustments to international flows will be prioritised. For values >1 adjustments to domestic flows will be prioritised
+
+#TODO add warning to flag when input base flows are 0
+
+split_gross_flows <- function(base_international, base_domestic, target_total,
+                              relative_international_confidence = 1,
+                              jump_scale = 10) {
 
   # as flows are modelled as Poisson distributions, values must be integers for the main part of the modelling process
   base_international <- abs(base_international)
@@ -32,8 +41,8 @@ split_gross_flows <- function(base_international, base_domestic, target_total, j
 
     #test whether making adjustment to inflow or outflow has bigger impact on combined likelihood
     #make adjustment to flow that gives smallest decrease
-    p_international_adjust <- dpois(new_international + int_adjust, base_international, log = TRUE) + dpois(new_domestic, base_domestic, log = TRUE)
-    p_domestic_adjust <- dpois(new_international, base_international, log = TRUE) + dpois(new_domestic + int_adjust, base_domestic, log = TRUE)
+    p_international_adjust <- relative_international_confidence * dpois(new_international + int_adjust, base_international, log = TRUE) + dpois(new_domestic, base_domestic, log = TRUE)
+    p_domestic_adjust <- relative_international_confidence * dpois(new_international, base_international, log = TRUE) + dpois(new_domestic + int_adjust, base_domestic, log = TRUE)
 
     if(p_international_adjust > p_domestic_adjust) {
       new_international <- new_international + int_adjust

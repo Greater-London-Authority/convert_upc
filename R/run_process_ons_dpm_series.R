@@ -31,10 +31,11 @@ if(!file.exists("data/intermediate/mye_2011_on(2023_geog).rds")) {
                            sheet_name = "MYEB2")
 }
 
+#read and prep inputs
+
 dpm_2011_on <- readRDS("data/intermediate/dpm_2011_on(2023_geog).rds")
 
 mye_2011_on <- readRDS("data/intermediate/mye_2011_on(2023_geog).rds")
-
 
 mye_inflows <- mye_2011_on %>%
   filter(year >= 2012) %>%
@@ -54,6 +55,10 @@ mye_outflows <- mye_2011_on %>%
   filter(component %in% c("internal_out", "international_out")) %>%
   pivot_wider(names_from = "component", values_from = "value")
 
+# model dpm flows
+
+relative_international_confidence_inflow = 3
+relative_international_confidence_outflow = 0.3
 
 modelled_dpm_inflows <- dpm_2011_on %>%
   filter(component == "total_in") %>%
@@ -62,7 +67,8 @@ modelled_dpm_inflows <- dpm_2011_on %>%
   left_join(mye_inflows, by = NULL) %>%
   mutate(model_flows = split_gross_flows(base_international = international_in,
                                          base_domestic = internal_in,
-                                         target_total = total_in)) %>%
+                                         target_total = total_in,
+                                         relative_international_confidence = relative_international_confidence_inflow)) %>%
   unnest_wider(col = model_flows) %>%
   select(-c(international_in, internal_in, total_in)) %>%
   rename(international_in = new_international,
@@ -78,7 +84,8 @@ modelled_dpm_outflows <- dpm_2011_on %>%
   left_join(mye_outflows, by = NULL) %>%
   mutate(model_flows = split_gross_flows(base_international = international_out,
                                          base_domestic = internal_out,
-                                         target_total = total_out)) %>%
+                                         target_total = total_out,
+                                         relative_international_confidence = relative_international_confidence_outflow)) %>%
   unnest_wider(col = model_flows) %>%
   select(-c(international_out, internal_out, total_out)) %>%
   rename(international_out = new_international,
@@ -86,6 +93,8 @@ modelled_dpm_outflows <- dpm_2011_on %>%
   pivot_longer(cols = c("international_out", "internal_out"),
                names_to = "component",
                values_to = "value")
+
+# add modelled flows to DPM series and save
 
 modelled_dpm_netflows <- bind_rows(
   modelled_dpm_inflows,
