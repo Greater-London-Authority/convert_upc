@@ -37,11 +37,7 @@ mye_comp <- bind_rows(
     mutate(source = "adjusted")) %>%
   filter(gss_code == sel_code,
          sex == sel_sex,
-         component %in% sel_components) %>%
-  mutate(value = case_when(
-    component == "international_out" ~ -value,
-    TRUE ~ value
-  ))
+         component %in% sel_components)
 
 mye_comp_totals <- mye_comp %>%
   group_by(across(-any_of(c("value", "age")))) %>%
@@ -54,7 +50,8 @@ mye_comp_totals <- mye_comp %>%
 ```
 
 ```{r, include = FALSE}
-sel_code <- "E08000035"
+
+sel_codes <- c("E08000035", "E06000018", "E08000026", "E09000007")
 sel_sex <- "female"
 sel_components <- c("international_in", "international_out", "international_net",
                     "unattrib", "total_net", 
@@ -67,17 +64,35 @@ dpm_comp <- bind_rows(
     mutate(source = "MYE adjusted"),
   readRDS("data/processed/new_dpm_series_2011_on.rds") %>%
     mutate(source = "DPM")) %>%
-  filter(gss_code == sel_code,
+  filter(gss_code %in% sel_codes,
          sex == sel_sex,
-         component %in% sel_components) %>%
-  mutate(value = case_when(
-    component == "international_out" ~ -value,
-    component == "internal_out" ~ -value,
-    component == "total_out" ~ -value,
-    TRUE ~ value
-  ))
+         component %in% sel_components) 
+
+
+dpm_total_flow_comps <- dpm_comp %>%
+  filter(component %in% c("international_in", "international_out", "international_net",
+                           "internal_in", "internal_out", "internal_net")) %>%
+  group_by(across(-any_of(c("value", "component")))) %>%
+  summarise(total_in = sum(value[component == "internal_in"]) + sum(value[component == "international_in"]),
+            total_out = sum(value[component == "internal_out"]) + sum(value[component == "international_out"]),
+            total_net = sum(value[component == "internal_net"]) + sum(value[component == "international_net"]),
+            .groups = "drop") %>%
+  pivot_longer(cols = c("total_in", "total_out", "total_net"), names_to = "component", values_to = "value")
+
+
+dpm_comp_ratios <- dpm_comp %>%
+  filter(component %in% c("international_in", "international_out",
+                          "internal_in", "internal_out")) %>%
+  pivot_wider(names_from = component, values_from = value) %>%
+  mutate(inflow = internal_in/(international_in + internal_in),
+         outflow = internal_out/(international_out + internal_out)) %>%
+  select(-c(internal_in, international_in, internal_out, international_out)) %>%
+  pivot_longer(cols = c("inflow", "outflow"), names_to = "direction", values_to = "proportion_internal")
+
 
 dpm_comp_totals <- dpm_comp %>%
+  filter(!component %in% c("total_in", "total_out", "total_net")) %>%
+  bind_rows(dpm_total_flow_comps) %>%
   group_by(across(-any_of(c("value", "age")))) %>%
   summarise(value = sum(value), .groups = "drop") %>%
   arrange(year) %>%
@@ -161,15 +176,24 @@ example_df <- data.frame(target_net = c(-100:100), base_in = 40, base_out = 15) 
 example_df %>%
   ggplot(aes(x = target_net, y = gross_flows, colour = direction)) +
   theme_minimal() +
-  geom_hline(yintercept = 0, colour = "grey") +
-  geom_hline(yintercept = c(40, -15), linetype = "dotted") +
-  geom_vline(xintercept = 25, linetype = "dotted") +
-  geom_line(linewidth = 1, alpha = 0.7) +
+  annotate("point", x = c(25, 25), y = c(40, -15)) +
+  geom_hline(yintercept = 0, colour = "darkgrey") +
+  geom_line() +
   labs(title = "Returned gross flow values by net flow target",
        subtitle = "base inflow = 40, base outflow = 15, original net = +25")
 
 
 ```
+
+```{r, include=FALSE}
+
+sel_yr <- 2019
+sel_nm <- "Camden"
+sel_sex <- "female"
+age_max <- 50
+
+```
+
 
 In this application the target international net flow is taken to be the sum of the values of the original international net flow and the UPC component.
 
@@ -179,14 +203,16 @@ The following charts illustrate the original and adjusted data for females in Ca
 ```{r, echo = FALSE}
 
 mye_comp_totals %>%
+      filter(gss_name == sel_nm,
+         sex == sel_sex) %>%
   filter(component %in% c("international_net", "unattrib")) %>%
   filter(between(year, 2011, 2021)) %>%
-  ggplot(aes(x = year, y = value, colour = component, linetype = source)) +
+  ggplot(aes(x = year, y = value, colour = source, linetype = component)) +
   theme_minimal() +
-  geom_hline(yintercept = 0, colour = "grey") +
-  geom_line(linewidth = 1, alpha = 0.4) +
+  geom_hline(yintercept = 0, colour = "darkgrey") +
+  geom_line() +
   labs(title = "Original and adjusted annual international net and UPC",
-       subtitle = "Camden, female") +
+       subtitle = paste0(sel_nm, ", ", sel_sex)) +
     scale_x_continuous(n.breaks = 9)
 
 ```
@@ -194,14 +220,16 @@ mye_comp_totals %>%
 ```{r, echo = FALSE}
 
 mye_comp_totals %>%
+    filter(gss_name == sel_nm,
+         sex == sel_sex) %>%
   filter(component %in% c("international_net", "unattrib")) %>%
   filter(between(year, 2011, 2021)) %>%
   ggplot(aes(x = year, y = cumulative_value, colour = source, linetype = component)) +
   theme_minimal() +
-  geom_hline(yintercept = 0, colour = "grey") +
-  geom_line(linewidth = 1, alpha = 0.4) +
+  geom_hline(yintercept = 0, colour = "darkgrey") +
+  geom_line() +
   labs(title = "Cummulative contribution of international net and UPC",
-       subtitle = "Camden, female") +
+       subtitle = paste0(sel_nm, ", ", sel_sex)) +
     scale_x_continuous(n.breaks = 9)
 
 ```
@@ -209,49 +237,37 @@ mye_comp_totals %>%
 ```{r, echo = FALSE}
 
 mye_comp %>%
-  filter(year == 2019) %>%
+  filter(gss_name == sel_nm,
+         sex == sel_sex) %>%
+  filter(year == sel_yr) %>%
+   filter(age <= age_max) %>%
   filter(component %in% c("international_net", "unattrib")) %>%
   ggplot(aes(x = age, y = value, colour = source, linetype = component)) +
   theme_minimal() +
-  geom_hline(yintercept = 0, colour = "grey") +
-  geom_line(alpha = 0.7) +
+  geom_hline(yintercept = 0, colour = "darkgrey") +
+  geom_line() +
   labs(title = "Original and adjusted international net and UPC",
-       subtitle = "Camden, female, 2019") + 
+  subtitle = paste0(sel_nm, ", ", sel_sex, ", ", sel_yr, ", age 0 to ", age_max)) +  
   scale_x_continuous(n.breaks = 9) +
-  facet_wrap("source")
+  facet_wrap("source", ncol = 1)
 
 ```
 
-```{r, echo = FALSE}
-
-mye_comp %>%
-  filter(year == 2019) %>%
-  filter(between(age, 19, 29)) %>%
-  filter(component %in% c("international_net", "unattrib")) %>%
-  ggplot(aes(x = age, y = value, colour = source, linetype = component)) +
-  theme_minimal() +
-  geom_hline(yintercept = 0, colour = "grey") +
-  geom_point(size = 3, alpha = 0.7) +
-  geom_line(linewidth = 1, alpha = 0.4) + 
-  labs(title = "Original and adjusted international net and UPC",
-       subtitle = "Camden, female, 2019; selected ages") + 
-  scale_x_continuous(n.breaks = 9)
-
-```
 As intended, the adjusted gross flows closely track the distributions of the original estimates by year and by age.
 
 ```{r, echo = FALSE}
 
 mye_comp_totals %>%
-  filter(component %in% c("international_in", "international_out")) %>%
+  filter(gss_name == sel_nm,
+         sex == sel_sex) %>%
+  filter(component %in% c("international_in", "international_out", "international_net")) %>%
   filter(between(year, 2011, 2021)) %>%
   ggplot(aes(x = year, y = value, colour = component, linetype = source)) +
   theme_minimal() +
-  geom_hline(yintercept = 0, colour = "grey") +
-  geom_line(linewidth = 1, alpha = 0.4) +
+  geom_hline(yintercept = 0, colour = "darkgrey") +
+  geom_line() +
   labs(title = "Original and adjusted annual international gross flows",
-       subtitle = "Camden, female",
-       caption = "Outflows shown as negative values") +
+       subtitle = paste0(sel_nm, ", ", sel_sex)) +
     scale_x_continuous(n.breaks = 9)
 
 ```
@@ -259,42 +275,38 @@ mye_comp_totals %>%
 ```{r, echo = FALSE}
 
 mye_comp %>%
-  filter(year == 2019) %>%
+  filter(gss_name == sel_nm,
+         sex == sel_sex) %>%
+  filter(year == sel_yr) %>%
+   filter(age <= age_max) %>%
   filter(component %in% c("international_in", "international_out")) %>%
   ggplot(aes(x = age, y = value, colour = component, linetype = source)) +
   theme_minimal() +
-  geom_hline(yintercept = 0, colour = "grey") +
-  geom_line(alpha = 0.7) +
+  geom_hline(yintercept = 0, colour = "darkgrey") +
+  geom_line() +
   labs(title = "Original and adjusted international gross flows by age",
-       subtitle = "Camden, female, 2019",
-       caption = "Outflows shown as negative values") +
-    scale_x_continuous(n.breaks = 9)
+         subtitle = paste0(sel_nm, ", ", sel_sex, ", ", sel_yr, ", age 0 to ", age_max)) +  
+    scale_x_continuous(n.breaks = 9) +
+  facet_wrap("component", ncol = 1)
 
 ```
 
-```{r, echo = FALSE}
+## Splitting total gross flows from the DPM outputs
 
-mye_comp %>%
-  filter(year == 2019) %>%
-  filter(between(age, 19, 29)) %>%
-  filter(component %in% c("international_in", "international_out")) %>%
-  ggplot(aes(x = age, y = value, colour = component, linetype = source)) +
-  theme_minimal() +
-  geom_hline(yintercept = 0, colour = "grey") +
-  geom_point(size = 3, alpha = 0.7) +
-  geom_line(linewidth = 1, alpha = 0.4) + 
-  scale_x_continuous(n.breaks = 9) +  
-  labs(title = "Original and adjusted international gross flows by age",
-       subtitle = "Camden, female, 2019; selected ages",
-       caption = "Outflows shown as negative values") 
+ONS has stated that it has a goal of making its admin-based population estimates the official series from 2025. To date, experimental outputs from the Dynamic Population Model - used to produce the admin-based estimates - do not include breakdowns of gross flows into separate domestic and international components.  While outputs are eventually expected to include the full set of components included in the current official series, the GLA has an interest in understanding how switching to the admin-based estimates may impact on the results of population projections so that the upcoming change can be can be accounted for in its work programme. Here we consider one option for splitting the total immigration and total emigration flows into international and domestic components, so that the data can be used as inputs to existing population models.  
 
-```
+The approach makes use of the domestic and international flows from the rebased MYE series to provide a basis for dividing the ABPE total flows. The simplest way to split the flows would likely be to simply allocate the total flows between international and domestic in the same proportions as in the MYE. The function used here supports this approach, but also allows the split to account for the relative confidence the user has in the accuracy of the original international and domestic flow estimates. If, for example, the user specifies that they have lower confidence in the international than the domestic estimates, the function will account for this in the fitting process - allowing the modelled international flow to more readily deviate from the base MYE value than it does the domestic when matching the total flow.
 
-## Splitting total gross flows from DPM
+The plot below illustrates how, for a given pair of base flows, the modelled international and domestic flows vary with both the target total flow figure and the relative confidence parameter specified, where:
+
+* a value of 1 represents equal confidence in the original international and domestic flow estimates and results in the same proportional split as the base flows
+* values < 1 represent lower levels of confidence in the accuracy of the original international flow estimates
+* values > 1 represent lower levels of confidence in the accuracy of the original domestic flow estimates
+
 
 ```{r, echo = FALSE}
 
-example_df <- expand.grid(target_total = c(0:400), relative_international_confidence = c(0.97, 0.98, 0.99, 1), 
+example_df <- expand.grid(target_total = c(0:400), relative_international_confidence = c(0.2, 0.5, 0.9, 1.1, 2, 5), 
                          base_international = 50, base_domestic = 100) %>%
   mutate(model_flows = split_gross_flows(base_international, base_domestic, target_total,
                                          relative_international_confidence,
@@ -306,12 +318,161 @@ example_df <- expand.grid(target_total = c(0:400), relative_international_confid
 example_df %>%
   ggplot(aes(x = target_total, y = value, colour = flow)) +
   theme_minimal() +
-  geom_hline(yintercept = c(50, 100), linetype = "dotted") +
-  geom_vline(xintercept = 150, linetype = "dotted") +
-  geom_line(linewidth = 1, alpha = 0.7) +
-  labs(title = "Returned flows by total target and relative confidence",
+  geom_hline(yintercept = 0, colour = "grey", alpha = 0.5) +
+  annotate("point", x = c(150, 150), y = c(50, 100)) +
+  geom_line() +
+  labs(title = "Returned flows by total target and choice of relative confidence parameter",
        subtitle = "base international = 50, base domestic = 100, original total flow = 150") +
-  facet_wrap("relative_international_confidence", ncol = 2)
+  facet_wrap("relative_international_confidence", ncol = 3)
 
+
+```
+
+```{r, include=FALSE}
+
+sel_yr <- 2022
+sel_nm <- "Camden"
+sel_sex <- "female"
+age_max <- 50
+
+```
+
+The following charts illustrate the modelled flows for the DPM alongside the original flows from the official mid-year estimates for females in Camden.  In this example, the relative confidence parameter for inflows has been (arbitrarily) set at 3 for inflows and 0.3 for outflows, meaning that, effectively, domestic migration will be prioritised for adjustment when fitting to total inflows and international migration will be prioritised for adjustment when fitting outflows.  In this case, the relative confidence parameters do not vary by age/sex, but there is scope to do so to account for known variations in the quality of the data for particular population groups.
+
+
+```{r, echo = FALSE}
+
+dpm_comp_totals %>%
+  filter(gss_name == sel_nm,
+         sex == sel_sex) %>%
+  filter(component %in% c("total_in", "total_out", "total_net")) %>%
+  filter(source %in% c("DPM", "MYE original")) %>%
+  filter(between(year, 2011, 2023)) %>%
+  ggplot(aes(x = year, y = value, colour = component, linetype = source)) +
+  theme_minimal() +
+  geom_hline(yintercept = 0, colour = "darkgrey") +
+  geom_line() +
+  labs(title = "Comparison of MYE and DPM annual total flows",
+       subtitle = paste0(sel_nm, ", ", sel_sex)) +
+    scale_x_continuous(n.breaks = 9)
+
+```
+
+
+```{r, echo = FALSE}
+
+dpm_comp_totals %>%
+  filter(gss_name == sel_nm,
+         sex == sel_sex) %>%
+  filter(component %in% c("international_net", "internal_net", "total_net")) %>%
+  filter(source %in% c("DPM", "MYE original")) %>%
+  filter(between(year, 2011, 2023)) %>%
+  ggplot(aes(x = year, y = value, colour = component, linetype = source)) +
+  theme_minimal() +
+  geom_hline(yintercept = 0, colour = "darkgrey") +
+  geom_line() +
+  labs(title = "Comparison of MYE and modelled DPM net flows",
+       subtitle = paste0(sel_nm, ", ", sel_sex)) +
+    scale_x_continuous(n.breaks = 9)
+
+```
+
+```{r, echo = FALSE}
+
+dpm_comp_totals %>%
+  filter(gss_name == sel_nm,
+         sex == sel_sex) %>%
+  filter(component %in% c("international_in", "international_out", "international_net")) %>%
+  filter(source %in% c("DPM", "MYE original")) %>%
+  filter(between(year, 2011, 2023)) %>%
+  ggplot(aes(x = year, y = value, colour = component, linetype = source)) +
+  theme_minimal() +
+  geom_hline(yintercept = 0, colour = "darkgrey") +
+  geom_line() +
+  labs(title = "Comparison of MYE and modelled DPM international flows",
+       subtitle = paste0(sel_nm, ", ", sel_sex)) +
+    scale_x_continuous(n.breaks = 9)
+
+```
+
+```{r, echo = FALSE}
+
+dpm_comp_totals %>%
+  filter(gss_name == sel_nm,
+         sex == sel_sex) %>%
+  filter(component %in% c("internal_in", "internal_out", "internal_net")) %>%
+  filter(source %in% c("DPM", "MYE original")) %>%
+  filter(between(year, 2011, 2023)) %>%
+  ggplot(aes(x = year, y = value, colour = component, linetype = source)) +
+  theme_minimal() +
+  geom_hline(yintercept = 0, colour = "darkgrey") +
+  geom_line() +
+  labs(title = "Comparison of MYE and modelled DPM internal flows",
+       subtitle = paste0(sel_nm, ", ", sel_sex)) +
+    scale_x_continuous(n.breaks = 9)
+
+```
+
+```{r, echo = FALSE}
+
+dpm_comp %>%
+  bind_rows(dpm_total_flow_comps) %>%
+  filter(gss_name == sel_nm,
+         sex == sel_sex) %>%
+  filter(year == sel_yr) %>%
+   filter(age <= age_max) %>%
+  filter(component %in% c("international_net", "internal_net", "total_net")) %>%
+  filter(source %in% c("DPM", "MYE original")) %>%
+  ggplot(aes(x = age, y = value, colour = component, linetype = source)) +
+  theme_minimal() +
+  geom_hline(yintercept = 0, colour = "darkgrey") +
+  geom_line() +
+  labs(title = "Comparison of MYE and modelled DPM net flows by age",
+       subtitle = paste0(sel_nm, ", ", sel_sex, ", ", sel_yr, ", age 0 to ", age_max)) +
+  scale_x_continuous(n.breaks = 9) +
+  facet_wrap("component", scales = "free_y", ncol = 1)
+
+```
+
+```{r, echo = FALSE}
+
+dpm_comp %>%
+  bind_rows(dpm_total_flow_comps) %>%
+  filter(gss_name == sel_nm,
+         sex == sel_sex) %>%
+  filter(year == sel_yr) %>%
+   filter(age <= age_max) %>%
+  filter(component %in% c("total_in", "total_out")) %>%
+  filter(source %in% c("DPM", "MYE original")) %>%
+  ggplot(aes(x = age, y = value, colour = component, linetype = source)) +
+  theme_minimal() +
+  geom_hline(yintercept = 0, colour = "darkgrey") +
+  geom_line() +
+  labs(title = "Comparison of MYE and DPM total gross flows by age",
+       subtitle = paste0(sel_nm, ", ", sel_sex, ", ", sel_yr, ", age 0 to ", age_max)) +
+    scale_x_continuous(n.breaks = 9) +
+    facet_wrap("component", ncol = 1)
+
+
+```
+
+
+```{r, echo = FALSE}
+
+dpm_comp %>%
+  filter(gss_name == sel_nm,
+         sex == sel_sex) %>%
+  filter(year == sel_yr) %>%
+  filter(age <= age_max) %>%
+  filter(component %in% c("internal_in", "internal_out", "international_in", "international_out")) %>%
+  filter(source %in% c("DPM", "MYE original")) %>%
+  ggplot(aes(x = age, y = value, colour = component, linetype = source)) +
+  theme_minimal() +
+  geom_hline(yintercept = 0, colour = "darkgrey") +
+  geom_line() +
+  labs(title = "",
+       subtitle = paste0(sel_nm, ", ", sel_sex, ", ", sel_yr, ", age 0 to ", age_max)) +
+  scale_x_continuous(n.breaks = 9) +
+  facet_wrap("component", ncol = 2, scales = "free_y")
 
 ```

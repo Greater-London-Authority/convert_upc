@@ -6,6 +6,8 @@
 # on an optimum solution. lower values of jump_scale may be faster, but potentially less reliable.
 # Always use a value greater than 1
 
+#TODO add warning to flag when input base flows are 0
+
 optimise_gross_flows <- function(base_in, base_out, target_net, jump_scale = 10) {
 
   # as flows are modelled as Poisson distributions, values must be integers for the main part of the modelling process
