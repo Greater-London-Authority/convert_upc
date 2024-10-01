@@ -3,19 +3,23 @@
 
 # convert_upc
 
-This repository contains two related examples of: \* how the
-Unattributable Population Change (UPC) component included in the rebased
-ONS mid-year estimate (MYE) population back series could be replaced
-with adjustments to the existing annual international migration
-estimates. \* how total in- and out-flows in ONS’s current Admin-Based
-Population Estimates (ABPE)/Dynamic Population Model (DPM) estimates
-could be split into separate international and domestic flows.
+This repository contains two related examples of:
+
+- how the Unattributable Population Change (UPC) component included in
+  the rebased ONS mid-year estimate (MYE) population back series could
+  be replaced with adjustments to the existing annual international
+  migration estimates.
+
+- how total in- and out-flows in ONS’s current Admin-Based Population
+  Estimates (ABPE)/Dynamic Population Model (DPM) estimates could be
+  split into separate international and domestic flows.
 
 ## Converting UPC in the rebased MYE series
 
-The method shown here uses a single function that takes an initial pair
-gross flows, together with a target net value, and returns new gross
-flows that are consistent with this net figure and represent the minimum
+The method shown here uses a single function
+(*R/functions/optimise_gross_flows.R*) that takes an initial pair gross
+flows, together with a target net value, and returns new gross flows
+that are consistent with this net figure and represent the minimum
 ‘cost’ change to the original flows.
 
 This function was originally developed by the GLA in its process for
@@ -23,9 +27,9 @@ creating the [rebased population
 estimates](https://data.london.gov.uk/dataset/modelled-population-backseries)
 used as a basis for the GLA’s population projections.
 
-The full GLA rebasing process is complex and involves fitting new annual
-net flows before splitting these out into gross flows and building a
-consistent annual population series.
+The full GLA rebasing process is somewhat complex and involves fitting
+new annual net flows before splitting these out into gross flows and
+building a consistent annual population series.
 
 However, if the goal is just to reassign already calculated UPC to
 international flows, without modifying the estimated population, then
@@ -33,21 +37,22 @@ the process is greatly simplified.
 
 ## Splitting ABPE total flows
 
-This method repurposes the function used for modifying a pair of base
-in- and out-flows to fit a target net flow such that it instead modifies
-a pair of flows with the same direction to fit a total figure, while
-accounting for the user’s relative confidence in the accuracy of the
-base international and domestic flow estimates.
+This method uses a related function (*R/functions/split_gross_flows.R*)
+to create modelled international and domestic gross flow estimates,
+based on a pair of initial estimates of each, and consistent with a
+‘target’ total flow figure, while accounting for the user’s relative
+confidence in the accuracy of these base estimates.
 
 Here the base domestic and international flows are taken from the ONS
 rebased MYE series and used to split the total flow components in the
 published ABPE/DPM series.
 
 Confidence in the accuracy of flow estimates will vary by area, age,
-sex, direction, and year. In this example, an arbitrary value of 0.98
-has been used for the confidence parameter in all cases - with values
-below 1 implying lower confidence in the accuracy of the original
-estimates of international migration than of domestic.
+sex, direction, and year. The function allows the user to readily
+account for her understanding of the relative accuracy of the base
+estimates across all these dimensions, but the example shown here uses
+largely arbitrary values of the relative confidence parameters for the
+purpose of illustration.
 
 ## Instructions
 
