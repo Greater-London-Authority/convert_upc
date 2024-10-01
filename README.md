@@ -59,7 +59,25 @@ estimates across all these dimensions, but the example shown here uses
 largely arbitrary values of the relative confidence parameters for the
 purpose of illustration.
 
-## Assign UPC between international and domestic flows
+## Reassigning UPC to a combination of international and domestic flows
+
+This method uses a combination of the methods and functions used in the
+previous two examples to replace the UPC component from the current MYE
+series with adjusted estimates of both international and domestic
+migration flows.
+
+The process involves two steps:
+
+1.  Allocate the UPC component between total inflows and total outflows
+    using the same approach as in the first example.
+
+2.  Split the total gross flows into separate domestic and international
+    components using the same method as in the second example.
+
+The method provides the user with the ability to account for the
+relative accuracy of the base estimates when splitting the flows between
+international and domestic components, but the example shown here again
+uses largely arbitrary values of the relative confidence parameters.
 
 ## Instructions
 
@@ -251,25 +269,6 @@ data for particular population groups.
 <img src="man/figures/README-unnamed-chunk-22-1.png" width="100%" />
 
 ## Assign UPC between international and domestic flows
-
-The final example combines the methods used in the previous two
-approaches to reassign the UPC component from the published MYE series
-to a combination of international and domestic gross migration flows.
-
-This is done in two steps:
-
-- First new total gross flows are fitted, using the sum of the original
-  international and domestic estimates as the base flow inputs, and the
-  sum of international net, domestic net, and UPC as the target net
-  flow.
-
-- Next the modelled total gross flows are split between international
-  and domestic, using the original MYE international and domestic
-  estimates as the base flows, and allowing the user to specify the
-  relative confidence levels of each. For this example values of 0.8 and
-  0.3 were taken for the inflow and outflows, respectively
-  (i.e. reflecting lower confidence in the accuracy of international
-  outflow estimates).
 
 The results for both Camden and Nottingham are shown below.
 

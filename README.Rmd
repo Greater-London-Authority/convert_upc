@@ -108,7 +108,6 @@ dpm_comp <- bind_rows(
          sex == sel_sex,
          component %in% sel_components) 
 
-
 dpm_total_flow_comps <- dpm_comp %>%
   filter(component %in% c("international_in", "international_out", "international_net",
                            "internal_in", "internal_out", "internal_net")) %>%
@@ -118,17 +117,6 @@ dpm_total_flow_comps <- dpm_comp %>%
             total_net = sum(value[component == "internal_net"]) + sum(value[component == "international_net"]),
             .groups = "drop") %>%
   pivot_longer(cols = c("total_in", "total_out", "total_net"), names_to = "component", values_to = "value")
-
-# 
-# dpm_comp_ratios <- dpm_comp %>%
-#   filter(component %in% c("international_in", "international_out",
-#                           "internal_in", "internal_out")) %>%
-#   pivot_wider(names_from = component, values_from = value) %>%
-#   mutate(inflow = internal_in/(international_in + internal_in),
-#          outflow = internal_out/(international_out + internal_out)) %>%
-#   select(-c(internal_in, international_in, internal_out, international_out)) %>%
-#   pivot_longer(cols = c("inflow", "outflow"), names_to = "direction", values_to = "proportion_internal")
-
 
 dpm_comp_totals <- dpm_comp %>%
   filter(!component %in% c("total_in", "total_out", "total_net")) %>%
@@ -171,9 +159,17 @@ Here the base domestic and international flows are taken from the ONS rebased MY
 
 Confidence in the accuracy of flow estimates will vary by area, age, sex, direction, and year. The function allows the user to readily account for her understanding of the relative accuracy of the base estimates across all these dimensions, but the example shown here uses largely arbitrary values of the relative confidence parameters for the purpose of illustration. 
 
-## Assign UPC between international and domestic flows
+## Reassigning UPC to a combination of international and domestic flows
 
+This method uses a combination of the methods and functions used in the previous two examples to replace the UPC component from the current MYE series with adjusted estimates of both international and domestic migration flows.
 
+The process involves two steps:
+
+1. Allocate the UPC component between total inflows and total outflows using the same approach as in the first example.
+
+2. Split the total gross flows into separate domestic and international components using the same method as in the second example.
+
+The method provides the user with the ability to account for the relative accuracy of the base estimates when splitting the flows between international and domestic components, but the example shown here again uses largely arbitrary values of the relative confidence parameters. 
 
 ## Instructions
 
@@ -543,14 +539,6 @@ dpm_comp %>%
 ```
 
 ## Assign UPC between international and domestic flows
-
-The final example combines the methods used in the previous two approaches to reassign the UPC component from the published MYE series to a combination of international and domestic gross migration flows.
-
-This is done in two steps:
-
-* First new total gross flows are fitted, using the sum of the original international and domestic estimates as the base flow inputs, and the sum of international net, domestic net, and UPC as the target net flow.
-
-* Next the modelled total gross flows are split between international and domestic, using the original MYE international and domestic estimates as the base flows, and allowing the user to specify the relative confidence levels of each.  For this example values of 0.8 and 0.3 were taken for the inflow and outflows, respectively (i.e. reflecting lower confidence in the accuracy of international outflow estimates).
 
 The results for both Camden and Nottingham are shown below.
 
