@@ -59,8 +59,10 @@ The two processes are run from the scripts
 
 - Fetch and clean the detailed mid-year estimates series published by
   ONS that covers the period 2011 to 2023
+
 - Create modelled alternative annual international gross flows that are
   consistent with the sum of the international_net and UPC components
+
 - Write out the new series to *data/processed/* as both an RDS file in
   tidy format and as a csv in a similar format to that originally
   published by ONS
@@ -69,11 +71,14 @@ The two processes are run from the scripts
 
 - Fetch and clean the detailed mid-year estimates series published by
   ONS that covers the period 2011 to 2023
+
 - Fetch and clean the current admin-based estimates series published
-  July 2024, which also covers the period 2011 to 2023 \* Create
-  modelled annual international and internal flow components that are
-  consistent with the original total immigration and emigration
+  July 2024, which also covers the period 2011 to 2023
+
+- Create modelled annual international and internal flow components that
+  are consistent with the original total immigration and emigration
   components
+
 - Write out the new series to *data/processed/* as both an RDS file in
   tidy format and as a csv in a similar format to that originally
   published by ONS
