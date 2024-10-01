@@ -3,7 +3,7 @@
 
 # convert_upc
 
-This repository contains two related examples of:
+This repository contains three related examples of:
 
 - how the Unattributable Population Change (UPC) component included in
   the rebased ONS mid-year estimate (MYE) population back series could
@@ -13,6 +13,11 @@ This repository contains two related examples of:
 - how total in- and out-flows in ONS’s current Admin-Based Population
   Estimates (ABPE)/Dynamic Population Model (DPM) estimates could be
   split into separate international and domestic flows.
+
+- how the Unattributable Population Change (UPC) component included in
+  the rebased ONS mid-year estimate (MYE) population back series could
+  be replaced with adjustments to a combination of international and
+  domestic flows.
 
 ## Converting UPC in the rebased MYE series
 
@@ -54,11 +59,13 @@ estimates across all these dimensions, but the example shown here uses
 largely arbitrary values of the relative confidence parameters for the
 purpose of illustration.
 
+## Assign UPC between international and domestic flows
+
 ## Instructions
 
-The two processes are run from the scripts
-*R/run_process_ons2023_mye_series.R* and
-*R/run_process_ons_dpm_series.R*, respectively.
+These three processes are run from the scripts
+*R/run_process_ons2023_mye_series.R*, *R/run_process_ons_dpm_series.R*,
+and *R/run_process_mye_upc_by_type.R*, respectively.
 
 *R/run_process_ons2023_mye_series.R* will:
 
@@ -68,7 +75,8 @@ The two processes are run from the scripts
 - Create modelled alternative annual international gross flows that are
   consistent with the sum of the international_net and UPC components
 
-- Write out the new series to *data/processed/* as both an RDS file in
+- Write out the new series to
+  *data/processed/modelled_mye_series_2011_on* as both an RDS file in
   tidy format and as a csv in a similar format to that originally
   published by ONS
 
@@ -84,7 +92,24 @@ The two processes are run from the scripts
   are consistent with the original total immigration and emigration
   components
 
-- Write out the new series to *data/processed/* as both an RDS file in
+- Write out the new series to *data/processed/new_dpm_series_2011_on* as
+  both an RDS file in tidy format and as a csv in a similar format to
+  that originally published by ONS
+
+*R/run_process_mye_upc_by_type.R* will:
+
+- Fetch and clean the detailed mid-year estimates series published by
+  ONS that covers the period 2011 to 2023
+
+- Create modelled alternative annual total gross flows that are
+  consistent with the sum of the international_net, internal_net, and
+  UPC components
+
+- Create modelled annual international and internal flow components that
+  are consistent with the modelled total gross flows
+
+- Write out the new series to
+  *data/processed/modelled_mye_series_2011_on* as both an RDS file in
   tidy format and as a csv in a similar format to that originally
   published by ONS
 
@@ -131,7 +156,7 @@ values unchanged.
 The example below illustrates how the modelled gross flows for a given
 pair of base flows vary with the target net figure.
 
-<img src="man/figures/README-unnamed-chunk-6-1.png" width="100%" />
+<img src="man/figures/README-unnamed-chunk-7-1.png" width="100%" />
 
 In this application the target international net flow is taken to be the
 sum of the values of the original international net flow and the UPC
@@ -142,18 +167,18 @@ females in Camden - a group with a very high UPC component in the
 rebased estimates which removes almost 18 thousand persons from the
 population over the course of the decade.
 
-<img src="man/figures/README-unnamed-chunk-8-1.png" width="100%" />
-
 <img src="man/figures/README-unnamed-chunk-9-1.png" width="100%" />
 
 <img src="man/figures/README-unnamed-chunk-10-1.png" width="100%" />
 
+<img src="man/figures/README-unnamed-chunk-11-1.png" width="100%" />
+
 As intended, the adjusted gross flows closely track the distributions of
 the original estimates by year and by age.
 
-<img src="man/figures/README-unnamed-chunk-11-1.png" width="100%" />
-
 <img src="man/figures/README-unnamed-chunk-12-1.png" width="100%" />
+
+<img src="man/figures/README-unnamed-chunk-13-1.png" width="100%" />
 
 ## Splitting total gross flows from the DPM outputs
 
@@ -198,7 +223,7 @@ where:
 - values \> 1 represent lower levels of confidence in the accuracy of
   the original domestic flow estimates
 
-<img src="man/figures/README-unnamed-chunk-13-1.png" width="100%" />
+<img src="man/figures/README-unnamed-chunk-14-1.png" width="100%" />
 
 The following charts illustrate the modelled flows for the DPM alongside
 the original flows from the official mid-year estimates for females in
@@ -211,8 +236,6 @@ the relative confidence parameters do not vary by age/sex, but there is
 scope to do so to account for known variations in the quality of the
 data for particular population groups.
 
-<img src="man/figures/README-unnamed-chunk-15-1.png" width="100%" />
-
 <img src="man/figures/README-unnamed-chunk-16-1.png" width="100%" />
 
 <img src="man/figures/README-unnamed-chunk-17-1.png" width="100%" />
@@ -224,3 +247,52 @@ data for particular population groups.
 <img src="man/figures/README-unnamed-chunk-20-1.png" width="100%" />
 
 <img src="man/figures/README-unnamed-chunk-21-1.png" width="100%" />
+
+<img src="man/figures/README-unnamed-chunk-22-1.png" width="100%" />
+
+## Assign UPC between international and domestic flows
+
+The final example combines the methods used in the previous two
+approaches to reassign the UPC component from the published MYE series
+to a combination of international and domestic gross migration flows.
+
+This is done in two steps:
+
+- First new total gross flows are fitted, using the sum of the original
+  international and domestic estimates as the base flow inputs, and the
+  sum of international net, domestic net, and UPC as the target net
+  flow.
+
+- Next the modelled total gross flows are split between international
+  and domestic, using the original MYE international and domestic
+  estimates as the base flows, and allowing the user to specify the
+  relative confidence levels of each. For this example values of 0.8 and
+  0.3 were taken for the inflow and outflows, respectively
+  (i.e. reflecting lower confidence in the accuracy of international
+  outflow estimates).
+
+The results for both Camden and Nottingham are shown below.
+
+<img src="man/figures/README-unnamed-chunk-24-1.png" width="100%" />
+
+<img src="man/figures/README-unnamed-chunk-25-1.png" width="100%" />
+
+<img src="man/figures/README-unnamed-chunk-26-1.png" width="100%" />
+
+<img src="man/figures/README-unnamed-chunk-27-1.png" width="100%" />
+
+<img src="man/figures/README-unnamed-chunk-28-1.png" width="100%" />
+
+<img src="man/figures/README-unnamed-chunk-29-1.png" width="100%" />
+
+<img src="man/figures/README-unnamed-chunk-31-1.png" width="100%" />
+
+<img src="man/figures/README-unnamed-chunk-32-1.png" width="100%" />
+
+<img src="man/figures/README-unnamed-chunk-33-1.png" width="100%" />
+
+<img src="man/figures/README-unnamed-chunk-34-1.png" width="100%" />
+
+<img src="man/figures/README-unnamed-chunk-35-1.png" width="100%" />
+
+<img src="man/figures/README-unnamed-chunk-36-1.png" width="100%" />

@@ -31,7 +31,7 @@ mye_total_flows <- mye_2011_on %>%
   filter(year >= 2012) %>%
   group_by(gss_code, gss_name, sex, age, year) %>%
   summarise(base_in = sum(value[component == "international_in"]) + sum(value[component == "internal_in"]),
-            base_out = sum(value[component == "international_out"]) + sum(value[component == "international_out"]),
+            base_out = sum(value[component == "international_out"]) + sum(value[component == "internal_out"]),
             total_net = sum(value[component %in% c("international_net", "internal_net", "unattrib")]),
             .groups = "drop") %>%
   mutate(base_in  = pmax(base_in, 0.5)) %>%
