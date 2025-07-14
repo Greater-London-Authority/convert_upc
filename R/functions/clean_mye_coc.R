@@ -17,6 +17,8 @@ clean_mye_coc <- function(raw_df) {
     mutate(sex = recode(sex,
                         "M" = "male",
                         "F" = "female",
+                        "m" = "male",
+                        "f" = "female",
                         "1" = "male",
                         "2" = "female")) %>%
     select(-country) %>%
